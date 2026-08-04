@@ -1,0 +1,729 @@
+openapi: 3.0.3
+info:
+  title: FarmStand API
+  description: >
+    API for FarmStand — a marketplace connecting farmers with buyers.
+    Farmers list produce; buyers search and place orders. Built for the
+    3MTT NextGen Knowledge Showcase 2.0 (Brief SD-02).
+  version: 1.0.0
+  contact:
+    name: Michael
+    email: admin@farmstand.demo
+servers:
+  - url: http://localhost:4000
+    description: Local development
+  - url: https://farmstand-api.onrender.com
+    description: Production (Render)
+  - url: https://virtserver.swaggerhub.com/alans-80a/Farmstand/1.0.0
+    description: SwaggerHub API Auto Mocking
+
+tags:
+  - name: Auth
+    description: Registration, login, and session management
+  - name: Listings
+    description: Farmer-created produce listings, search, and discovery
+  - name: Orders
+    description: Buyer orders placed against listings
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new account
+      operationId: registerUser
+      description: >
+        Creates a new user with a fixed role (FARMER or BUYER). The role
+        cannot be changed after signup in v1.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDto'
+      responses:
+        '201':
+          description: Account created and session cookie set
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: token=eyJhbGciOi...; HttpOnly; Path=/; SameSite=Lax
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 409
+                message: "Email is already registered"
+                error: "Conflict"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in to an existing account
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDto'
+      responses:
+        '200':
+          description: Logged in, session cookie set
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: token=eyJhbGciOi...; HttpOnly; Path=/; SameSite=Lax
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid email or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 401
+                message: "Invalid email or password"
+                error: "Unauthorized"
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Log out
+      operationId: logoutUser
+      description: Clears the session cookie.
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Logged out successfully
+
+  /listings:
+    get:
+      tags: [Listings]
+      summary: Search and browse listings
+      operationId: getListings
+      description: Public endpoint. No authentication required.
+      parameters:
+        - name: q
+          in: query
+          description: Free-text search across crop name, description, category
+          schema:
+            type: string
+          example: tomatoes
+        - name: category
+          in: query
+          schema:
+            $ref: '#/components/schemas/ListingCategory'
+        - name: location
+          in: query
+          description: Free-text match on state/town
+          schema:
+            type: string
+          example: Abia
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, price_asc, price_desc]
+            default: newest
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Paginated list of listings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedListings'
+    post:
+      tags: [Listings]
+      summary: Create a listing
+      operationId: createListing
+      description: Requires a FARMER-role account. Photo is required.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateListingDto'
+      responses:
+        '201':
+          description: Listing created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Listing'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenFarmerAction'
+
+  /listings/{id}:
+    get:
+      tags: [Listings]
+      summary: Get listing detail
+      operationId: getListingById
+      parameters:
+        - $ref: '#/components/parameters/ListingId'
+      responses:
+        '200':
+          description: Listing detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Listing'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Listings]
+      summary: Update a listing
+      operationId: updateListing
+      description: Requires FARMER role and ownership of the listing.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ListingId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateListingDto'
+      responses:
+        '200':
+          description: Listing updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Listing'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenListingOwner'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Listings]
+      summary: Delete a listing
+      operationId: deleteListing
+      description: Requires FARMER role and ownership of the listing.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ListingId'
+      responses:
+        '204':
+          description: Listing deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenListingOwner'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Place an order
+      operationId: createOrder
+      description: >
+        Requires a BUYER-role account. Quantity must not exceed the
+        listing's available quantity.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderDto'
+      responses:
+        '201':
+          description: Order placed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Quantity exceeds available stock, or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Account role is not BUYER
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 403
+                message: "This action requires a BUYER account."
+                error: "Forbidden"
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /orders/mine:
+    get:
+      tags: [Orders]
+      summary: Get the logged-in buyer's order history
+      operationId: getMyOrders
+      description: Requires BUYER role.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+      responses:
+        '200':
+          description: List of the buyer's orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /orders/received:
+    get:
+      tags: [Orders]
+      summary: Get orders placed on the logged-in farmer's listings
+      operationId: getReceivedOrders
+      description: Requires FARMER role.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+      responses:
+        '200':
+          description: List of orders received on the farmer's listings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /orders/{id}/status:
+    patch:
+      tags: [Orders]
+      summary: Update an order's status
+      operationId: updateOrderStatus
+      description: >
+        Requires FARMER role and ownership of the listing the order was
+        placed on. Valid transitions: PENDING -> CONFIRMED -> FULFILLED,
+        or PENDING/CONFIRMED -> CANCELLED.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: ord_8f3ka2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrderStatusDto'
+      responses:
+        '200':
+          description: Order status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Not the owner of the listing this order belongs to
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 403
+                message: "You do not have permission to update this order."
+                error: "Forbidden"
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+      description: JWT issued at login/register, stored as an httpOnly cookie.
+
+  parameters:
+    ListingId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      example: lst_9d2ma7
+
+  responses:
+    Unauthorized:
+      description: Not logged in
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 401
+            message: "Authentication required."
+            error: "Unauthorized"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 404
+            message: "Resource not found."
+            error: "Not Found"
+    ValidationError:
+      description: Request body failed validation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 400
+            message: "Validation failed"
+            error: "Bad Request"
+    ForbiddenFarmerAction:
+      description: Account role is not FARMER
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 403
+            message: "This action requires a FARMER account."
+            error: "Forbidden"
+    ForbiddenListingOwner:
+      description: Not the owner of this listing, or not a FARMER account
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 403
+            message: "You are not authorized to modify this listing."
+            error: "Forbidden"
+
+  schemas:
+    Role:
+      type: string
+      enum: [FARMER, BUYER]
+
+    ListingStatus:
+      type: string
+      enum: [ACTIVE, SOLD_OUT]
+
+    ListingCategory:
+      type: string
+      enum: [Vegetables, Tubers, Fruits, Staples]
+
+    OrderStatus:
+      type: string
+      enum: [PENDING, CONFIRMED, FULFILLED, CANCELLED]
+
+    ErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: An unexpected error occurred.
+        error:
+          type: string
+          example: Bad Request
+
+    RegisterDto:
+      type: object
+      required: [name, email, password, role]
+      properties:
+        name:
+          type: string
+          example: Adaeze Nwosu
+        email:
+          type: string
+          format: email
+          example: adaeze@farm.demo
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: password123
+        role:
+          $ref: '#/components/schemas/Role'
+
+    LoginDto:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: adaeze@farm.demo
+        password:
+          type: string
+          format: password
+          example: password123
+
+    AuthResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: usr_4kd82n
+        name:
+          type: string
+          example: Adaeze Nwosu
+        email:
+          type: string
+          example: adaeze@farm.demo
+        role:
+          $ref: '#/components/schemas/Role'
+
+    Listing:
+      type: object
+      properties:
+        id:
+          type: string
+          example: lst_9d2ma7
+        title:
+          type: string
+          example: Tomatoes
+        category:
+          $ref: '#/components/schemas/ListingCategory'
+        description:
+          type: string
+          example: Freshly harvested, vine-ripened tomatoes.
+        price:
+          type: number
+          example: 8500
+        unit:
+          type: string
+          example: basket
+        quantity:
+          type: integer
+          example: 12
+        location:
+          type: string
+          example: Umuahia, Abia
+        imageUrl:
+          type: string
+          format: uri
+          example: https://res.cloudinary.com/farmstand/image/upload/v1/tomatoes.jpg
+        status:
+          $ref: '#/components/schemas/ListingStatus'
+        farmerId:
+          type: string
+          example: usr_4kd82n
+        farmerName:
+          type: string
+          example: Adaeze Nwosu
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateListingDto:
+      type: object
+      required: [title, category, price, unit, quantity, location, imageUrl]
+      properties:
+        title:
+          type: string
+          example: Tomatoes
+        category:
+          $ref: '#/components/schemas/ListingCategory'
+        description:
+          type: string
+          example: Freshly harvested, vine-ripened tomatoes.
+        price:
+          type: number
+          minimum: 1
+          example: 8500
+        unit:
+          type: string
+          example: basket
+        quantity:
+          type: integer
+          minimum: 1
+          example: 12
+        location:
+          type: string
+          example: Umuahia, Abia
+        imageUrl:
+          type: string
+          format: uri
+          description: Cloudinary URL returned by the client-side unsigned upload.
+          example: https://res.cloudinary.com/farmstand/image/upload/v1/tomatoes.jpg
+
+    UpdateListingDto:
+      type: object
+      description: All fields optional — send only what's changing.
+      properties:
+        title:
+          type: string
+        category:
+          $ref: '#/components/schemas/ListingCategory'
+        description:
+          type: string
+        price:
+          type: number
+          minimum: 1
+        unit:
+          type: string
+        quantity:
+          type: integer
+          minimum: 0
+        location:
+          type: string
+        imageUrl:
+          type: string
+          format: uri
+        status:
+          $ref: '#/components/schemas/ListingStatus'
+
+    PaginatedListings:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Listing'
+        page:
+          type: integer
+          example: 1
+        pageSize:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 47
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          example: ord_8f3ka2
+        listingId:
+          type: string
+          example: lst_9d2ma7
+        listingTitle:
+          type: string
+          example: Tomatoes
+        quantity:
+          type: integer
+          example: 2
+        unit:
+          type: string
+          example: basket
+        unitPriceAtOrder:
+          type: number
+          example: 8500
+        total:
+          type: number
+          example: 17000
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        buyerId:
+          type: string
+          example: usr_7bq91x
+        buyerName:
+          type: string
+          example: Chidi Okafor
+        farmerId:
+          type: string
+          example: usr_4kd82n
+        farmerName:
+          type: string
+          example: Adaeze Nwosu
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateOrderDto:
+      type: object
+      required: [listingId, quantity]
+      properties:
+        listingId:
+          type: string
+          example: lst_9d2ma7
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+
+    UpdateOrderStatusDto:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/OrderStatus'
