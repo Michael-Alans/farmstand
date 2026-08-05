@@ -1,5 +1,5 @@
 'use client';
-import { use, useEffect, useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { listingsApi, ordersApi, Listing } from '@/lib/api';
 import { formatNaira } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
@@ -8,8 +8,8 @@ import Link from 'next/link';
 import { MapPin, Package, Loader2, ShoppingBasket, ArrowLeft, User } from 'lucide-react';
 import OrderStatusBadge from '@/components/OrderStatusBadge';
 
-export default function ListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function ListingDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const { user } = useAuth();
   const router = useRouter();
   const [listing, setListing] = useState<Listing | null>(null);
