@@ -1,11 +1,11 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth } from '../../../lib/auth-context';
 import { useRouter } from 'next/navigation';
-import { ordersApi, Order, OrderStatus } from '@/lib/api';
-import { formatNaira } from '@/lib/utils';
-import OrderStatusBadge from '@/components/OrderStatusBadge';
-import { useWebSocket } from '@/lib/useWebSocket'; // ← new
+import { ordersApi, Order, OrderStatus } from '../../../lib/api';
+import { formatNaira } from '../../../lib/utils';
+import OrderStatusBadge from '../../../components/OrderStatusBadge';
+import { useWebSocket } from '../../../lib/useWebSocket';
 import { Loader2, ShoppingBasket, Calendar } from 'lucide-react';
 import Link from 'next/link';
 
