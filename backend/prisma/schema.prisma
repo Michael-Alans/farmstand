@@ -43,6 +43,7 @@ model Order {
   unitPriceAtOrder Float
   total            Float
   status           OrderStatus @default(PENDING)
+  paymentReference String?
   buyerId          String
   farmerId         String
   createdAt        DateTime    @default(now())

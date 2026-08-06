@@ -31,6 +31,7 @@ export class OrdersService {
           total,
           buyerId,
           farmerId: listing.farmerId,
+          paymentReference: createOrderDto.paymentReference,
         },
       });
 

@@ -5,8 +5,9 @@ import { formatNaira } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, Package, Loader2, ShoppingBasket, ArrowLeft, User } from 'lucide-react';
+import { MapPin, Package, Loader2, ShoppingBasket, ArrowLeft, User, CreditCard } from 'lucide-react';
 import OrderStatusBadge from '@/components/OrderStatusBadge';
+import SimulatedPaystackModal from '@/components/SimulatedPaystackModal';
 
 export default function ListingDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
@@ -18,18 +19,24 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
   const [ordering, setOrdering] = useState(false);
   const [orderError, setOrderError] = useState('');
   const [orderSuccess, setOrderSuccess] = useState(false);
+  const [showPaystack, setShowPaystack] = useState(false);
 
   useEffect(() => {
     listingsApi.getOne(id).then(setListing).catch(console.error).finally(() => setLoading(false));
   }, [id]);
 
-  async function handleOrder(e: FormEvent) {
+  function initiateOrder(e: FormEvent) {
     e.preventDefault();
     if (!user) { router.push('/login'); return; }
+    setShowPaystack(true);
+  }
+
+  async function executeOrder(paymentReference: string) {
+    setShowPaystack(false);
     setOrdering(true);
     setOrderError('');
     try {
-      await ordersApi.create({ listingId: id, quantity });
+      await ordersApi.create({ listingId: id, quantity, paymentReference });
       setOrderSuccess(true);
     } catch (err: unknown) {
       setOrderError(err instanceof Error ? err.message : 'Failed to place order');
@@ -101,13 +108,13 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
 
           {/* Order form */}
           {listing.status === 'ACTIVE' && user?.role === 'BUYER' && (
-            <form onSubmit={handleOrder} className="mt-6 bg-green-50 rounded-2xl p-5 border border-green-100">
+            <form onSubmit={initiateOrder} className="mt-6 bg-green-50 rounded-2xl p-5 border border-green-100">
               <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                 <ShoppingBasket className="w-4 h-4 text-green-700" /> Place an order
               </h2>
               {orderSuccess ? (
                 <div className="bg-green-100 text-green-800 rounded-xl px-4 py-3 text-sm font-medium">
-                  ✅ Order placed! Check your <Link href="/dashboard/buyer" className="underline">order history</Link>.
+                  ✅ Order placed successfully! Check your <Link href="/dashboard/buyer" className="underline">order history</Link>.
                 </div>
               ) : (
                 <>
@@ -124,14 +131,13 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
                   </div>
                   <p className="text-sm text-gray-500 mb-4">
                     Total: <strong className="text-gray-800">{formatNaira(listing.price * quantity)}</strong>
-                    <span className="text-xs ml-1 text-gray-400">(payment arranged directly with farmer)</span>
                   </p>
                   <button
                     type="submit" disabled={ordering}
-                    className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+                    className="w-full bg-[#0ba4db] hover:bg-[#008fca] disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-[#0ba4db]/20"
                   >
-                    {ordering && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {ordering ? 'Placing order…' : 'Place order'}
+                    {ordering ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+                    {ordering ? 'Placing order…' : 'Pay & Place Order'}
                   </button>
                 </>
               )}
@@ -145,6 +151,16 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
           )}
         </div>
       </div>
+
+      {/* Paystack Simulation Modal */}
+      {showPaystack && user && listing && (
+        <SimulatedPaystackModal
+          amount={listing.price * quantity}
+          email={user.email}
+          onClose={() => setShowPaystack(false)}
+          onSuccess={executeOrder}
+        />
+      )}
     </div>
   );
 }

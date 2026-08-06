@@ -136,6 +136,7 @@ export interface Order {
   unitPriceAtOrder: number;
   total: number;
   status: OrderStatus;
+  paymentReference?: string | null;
   buyerId: string;
   buyerName: string;
   farmerId: string;
@@ -148,7 +149,7 @@ export interface Order {
 }
 
 export const ordersApi = {
-  create: (data: { listingId: string; quantity: number }) =>
+  create: (data: { listingId: string; quantity: number; paymentReference?: string }) =>
     request<Order>('/orders', { method: 'POST', body: JSON.stringify(data) }),
   mine: (status?: OrderStatus) =>
     request<Order[]>(`/orders/mine${status ? `?status=${status}` : ''}`),
