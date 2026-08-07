@@ -3,3 +3,7 @@ node_modules
 .env
 
 /generated/prisma
+
+# Incremental build cache — never commit, causes stale builds
+tsconfig.build.tsbuildinfo
+dist/
