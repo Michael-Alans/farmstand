@@ -2,6 +2,9 @@ import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Get } from '@n
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
 
@@ -23,8 +26,6 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @Post('logout')
   logout() {
-    // We are using Bearer tokens, so server-side logout is a no-op 
-    // unless we implement token blacklisting.
     return;
   }
 
@@ -32,5 +33,24 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: any) {
     return user;
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post('change-password')
+  changePassword(@CurrentUser() user: any, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(user.id, dto);
   }
 }

@@ -111,4 +111,28 @@ export class OrdersService {
       return updatedOrder;
     });
   }
+
+  async releaseEscrow(orderId: string, buyerId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.buyerId !== buyerId) throw new ForbiddenException('Only the buyer can release this escrow');
+    if (order.status !== 'FULFILLED') throw new BadRequestException('Order must be FULFILLED before releasing escrow');
+    if (order.escrowStatus !== 'HELD') throw new BadRequestException('Escrow is no longer held');
+
+    return this.prisma.$transaction(async (prisma) => {
+      // 1. Mark escrow as Released
+      const updatedOrder = await prisma.order.update({
+        where: { id: orderId },
+        data: { escrowStatus: 'RELEASED' }
+      });
+
+      // 2. Transfer funds to Farmer's wallet
+      await prisma.user.update({
+        where: { id: order.farmerId },
+        data: { walletBalance: { increment: order.total } }
+      });
+
+      return updatedOrder;
+    });
+  }
 }

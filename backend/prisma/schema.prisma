@@ -7,15 +7,21 @@ datasource db {
 }
 
 model User {
-  id             String    @id @default(uuid())
-  name           String
-  email          String    @unique
-  password       String
-  role           Role
-  createdAt      DateTime  @default(now())
-  listings       Listing[]
-  ordersAsBuyer  Order[]   @relation("BuyerOrders")
-  ordersAsFarmer Order[]   @relation("FarmerOrders")
+  id                   String    @id @default(uuid())
+  name                 String
+  email                String    @unique
+  password             String
+  role                 Role
+  bio                  String?
+  avatarUrl            String?
+  isKycVerified        Boolean   @default(false)
+  walletBalance        Float     @default(0)
+  passwordResetToken   String?
+  passwordResetExpiry  DateTime?
+  createdAt            DateTime  @default(now())
+  listings             Listing[]
+  ordersAsBuyer        Order[]   @relation("BuyerOrders")
+  ordersAsFarmer       Order[]   @relation("FarmerOrders")
 }
 
 model Listing {
@@ -31,7 +37,7 @@ model Listing {
   status      ListingStatus   @default(ACTIVE)
   farmerId    String
   createdAt   DateTime        @default(now())
-  farmer      User            @relation(fields: [farmerId], references: [id])
+  farmer      User            @relation(fields: [farmerId], references: [id], onDelete: Cascade)
   orders      Order[]
 }
 
@@ -43,13 +49,14 @@ model Order {
   unitPriceAtOrder Float
   total            Float
   status           OrderStatus @default(PENDING)
+  escrowStatus     EscrowStatus @default(HELD)
   paymentReference String?
   buyerId          String
   farmerId         String
   createdAt        DateTime    @default(now())
-  buyer            User        @relation("BuyerOrders", fields: [buyerId], references: [id])
-  farmer           User        @relation("FarmerOrders", fields: [farmerId], references: [id])
-  listing          Listing     @relation(fields: [listingId], references: [id])
+  buyer            User        @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Cascade)
+  farmer           User        @relation("FarmerOrders", fields: [farmerId], references: [id], onDelete: Cascade)
+  listing          Listing     @relation(fields: [listingId], references: [id], onDelete: Cascade)
 }
 
 enum Role {
@@ -74,4 +81,10 @@ enum OrderStatus {
   CONFIRMED
   FULFILLED
   CANCELLED
+}
+
+enum EscrowStatus {
+  HELD
+  RELEASED
+  REFUNDED
 }

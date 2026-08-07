@@ -2,14 +2,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
-import { listingsApi, ordersApi, Listing, Order, OrderStatus, ListingCategory } from '@/lib/api';
+import Link from 'next/link';
+import { listingsApi, ordersApi, usersApi, Listing, Order, OrderStatus, ListingCategory } from '@/lib/api';
+import { authApi } from '@/lib/api';
 import { formatNaira, CATEGORIES, UNITS } from '@/lib/utils';
 import CloudinaryUpload from '@/components/CloudinaryUpload';
 import OrderStatusBadge from '@/components/OrderStatusBadge';
-import { useWebSocket } from '@/lib/useWebSocket'; // ← new
+import { useWebSocket } from '@/lib/useWebSocket';
 import {
-  Loader2, Plus, Trash2, Edit3, Package, ClipboardList,
-  TrendingUp, X, CheckCircle
+  Loader2, Plus, Trash2, Package, ClipboardList,
+  TrendingUp, X, CheckCircle, Wallet, BadgeCheck, ShieldCheck, User
 } from 'lucide-react';
 
 /* ─── Create Listing Modal ─────────────────────────────── */
@@ -120,14 +122,32 @@ function CreateListingModal({ onClose, onCreated }: { onClose: () => void; onCre
 
 /* ─── Farmer Dashboard ─────────────────────────────────── */
 export default function FarmerDashboard() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, updateUser } = useAuth();
   const router = useRouter();
   const [listings, setListings] = useState<Listing[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [tab, setTab] = useState<'listings' | 'orders'>('listings');
+  const [tab, setTab] = useState<'listings' | 'orders' | 'profile'>('listings');
   const [showModal, setShowModal] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [updatingOrder, setUpdatingOrder] = useState<string | null>(null);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [isKycVerified, setIsKycVerified] = useState(false);
+  const [kycLoading, setKycLoading] = useState(false);
+  const [kycDone, setKycDone] = useState(false);
+  const [kycError, setKycError] = useState('');
+  const [bio, setBio] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [profileError, setProfileError] = useState('');
+
+  // Change password state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordChanged, setPasswordChanged] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== 'FARMER')) {
@@ -135,16 +155,27 @@ export default function FarmerDashboard() {
     }
   }, [user, isLoading, router]);
 
+  // Sync local KYC/profile state from the shared auth user
+  // whenever it changes (initial load, after login, after updateUser calls).
+  useEffect(() => {
+    if (user) {
+      setIsKycVerified(!!user.isKycVerified);
+      setBio(user.bio ?? '');
+      setAvatarUrl(user.avatarUrl ?? '');
+    }
+  }, [user]);
+
   const fetchData = useCallback(async () => {
     setLoadingData(true);
     try {
-      const [listData, orderData] = await Promise.all([
+      const [listData, orderData, walletData] = await Promise.all([
         listingsApi.getAll({ pageSize: 50 }),
         ordersApi.received(),
+        usersApi.getWalletBalance(),
       ]);
-      // Filter to only this farmer's listings
       setListings(listData.items.filter(l => l.farmerId === user?.id));
       setOrders(orderData);
+      setWalletBalance(walletData.walletBalance);
     } catch (e) { console.error(e); }
     finally { setLoadingData(false); }
   }, [user?.id]);
@@ -181,6 +212,57 @@ export default function FarmerDashboard() {
     finally { setUpdatingOrder(null); }
   }
 
+  async function handleSimulateKyc() {
+    setKycLoading(true);
+    setKycError('');
+    // Simulate 3-second identity check
+    setTimeout(async () => {
+      try {
+        const res = await usersApi.simulateKyc();
+        setIsKycVerified(true);
+        setKycDone(true);
+        updateUser({ isKycVerified: res.isKycVerified });
+      } catch (e) {
+        setKycError(e instanceof Error ? e.message : 'Verification failed. Please try again.');
+      } finally {
+        setKycLoading(false);
+      }
+    }, 3000);
+  }
+
+  async function handleSaveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingProfile(true);
+    setProfileError('');
+    try {
+      const res = await usersApi.updateProfile({ bio, avatarUrl });
+      setProfileSaved(true);
+      updateUser({ bio: res.bio, avatarUrl: res.avatarUrl });
+      setTimeout(() => setProfileSaved(false), 3000);
+    } catch (e) {
+      setProfileError(e instanceof Error ? e.message : 'Failed to save profile. Please try again.');
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) { setPasswordError('Passwords do not match.'); return; }
+    setChangingPassword(true);
+    setPasswordError('');
+    try {
+      await authApi.changePassword(currentPassword, newPassword);
+      setPasswordChanged(true);
+      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+      setTimeout(() => setPasswordChanged(false), 3000);
+    } catch (e) {
+      setPasswordError(e instanceof Error ? e.message : 'Failed to change password.');
+    } finally {
+      setChangingPassword(false);
+    }
+  }
+
   const activeListings = listings.filter(l => l.status === 'ACTIVE').length;
   const pendingOrders = orders.filter(o => o.status === 'PENDING').length;
 
@@ -193,16 +275,34 @@ export default function FarmerDashboard() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Farmer Dashboard</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900">Farmer Dashboard</h1>
+            {isKycVerified && (
+              <span title="KYC Verified">
+                <BadgeCheck className="w-5 h-5 text-blue-500" />
+              </span>
+            )}
+          </div>
           <p className="text-gray-500 text-sm mt-0.5">
             Welcome back, {user.name.split(' ')[0]} 👋
             {isConnected && <span className="ml-2 text-green-600 text-xs">● Live</span>}
           </p>
         </div>
-        <button onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
-          <Plus className="w-4 h-4" /> New listing
-        </button>
+        <div className="flex items-center gap-3">
+          {walletBalance !== null && (
+            <div className="flex items-center gap-2 bg-green-50 border border-green-100 text-green-800 px-4 py-2.5 rounded-xl">
+              <Wallet className="w-4 h-4" />
+              <div>
+                <p className="text-xs text-green-600 font-medium">Wallet</p>
+                <p className="text-base font-bold">{formatNaira(walletBalance)}</p>
+              </div>
+            </div>
+          )}
+          <button onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
+            <Plus className="w-4 h-4" /> New listing
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -226,12 +326,11 @@ export default function FarmerDashboard() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit mb-6">
-        {(['listings', 'orders'] as const).map(t => (
+        {(['listings', 'orders', 'profile'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-5 py-2 text-sm font-medium rounded-lg transition-colors capitalize ${
-              tab === t ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            }`}>
-            {t === 'orders' ? `Orders (${orders.length})` : `My Listings (${listings.length})`}
+            className={`px-5 py-2 text-sm font-medium rounded-lg transition-colors capitalize ${tab === t ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}>
+            {t === 'orders' ? `Orders (${orders.length})` : t === 'listings' ? `My Listings (${listings.length})` : 'My Profile'}
           </button>
         ))}
       </div>
@@ -276,9 +375,8 @@ export default function FarmerDashboard() {
                     <td className="px-4 py-3 text-gray-700">{formatNaira(listing.price)}/{listing.unit}</td>
                     <td className="px-4 py-3 text-gray-600">{listing.quantity}</td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                        listing.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                      }`}>{listing.status}</span>
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${listing.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                        }`}>{listing.status}</span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -296,6 +394,126 @@ export default function FarmerDashboard() {
             </table>
           </div>
         )
+      ) : tab === 'profile' ? (
+        /* ── Profile Tab ── */
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* KYC Panel */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <ShieldCheck className="w-5 h-5 text-blue-500" />
+              <h3 className="text-base font-bold text-gray-900">Identity Verification (KYC)</h3>
+            </div>
+            {isKycVerified || kycDone ? (
+              <div className="flex items-center gap-3 bg-green-50 text-green-800 rounded-xl px-4 py-3">
+                <BadgeCheck className="w-5 h-5" />
+                <div>
+                  <p className="font-semibold text-sm">Verified ✓</p>
+                  <p className="text-xs text-green-600">Your identity is confirmed. A badge now shows on your listings.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-500">Upload your valid ID to unlock the Trusted Farmer badge and build buyer trust.</p>
+                <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center text-sm text-gray-400">
+                  <User className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                  NIN / BVN slip or government-issued ID
+                </div>
+                {kycError && (
+                  <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{kycError}</p>
+                )}
+                <button
+                  onClick={handleSimulateKyc}
+                  disabled={kycLoading}
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl transition-colors disabled:opacity-60"
+                >
+                  {kycLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying identity…</> : 'Submit for Verification'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Profile Editor */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-6">
+            <h3 className="text-base font-bold text-gray-900 mb-4">Public Profile</h3>
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
+                <textarea
+                  rows={4}
+                  value={bio}
+                  onChange={e => setBio(e.target.value)}
+                  placeholder="Tell buyers about your farm, your growing methods, your produce…"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-green-500 resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Profile Photo</label>
+                <CloudinaryUpload onUpload={url => setAvatarUrl(url)} />
+                {avatarUrl && (
+                  <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" /> Photo uploaded
+                  </p>
+                )}
+              </div>
+              {profileError && (
+                  <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{profileError}</p>
+                )}
+                {profileSaved && (
+                  <p className="text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg flex items-center gap-1">
+                    <CheckCircle className="w-3.5 h-3.5" /> Profile saved successfully!
+                  </p>
+                )}
+              <button
+                type="submit"
+                disabled={savingProfile}
+                className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-xl transition-colors disabled:opacity-60"
+              >
+                {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                {savingProfile ? 'Saving…' : 'Save Profile'}
+              </button>
+            </form>
+          </div>
+
+          {/* Change Password */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-6 md:col-span-2">
+            <h3 className="text-base font-bold text-gray-900 mb-4">Change Password</h3>
+            <form onSubmit={handleChangePassword} className="grid md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Current password</label>
+                <input type="password" required value={currentPassword} onChange={e => setCurrentPassword(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-green-500"
+                  placeholder="••••••••" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New password</label>
+                <input type="password" required minLength={8} value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-green-500"
+                  placeholder="At least 8 characters" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm new password</label>
+                <input type="password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-green-500"
+                  placeholder="Repeat new password" />
+              </div>
+              {passwordError && (
+                <p className="md:col-span-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{passwordError}</p>
+              )}
+              {passwordChanged && (
+                <p className="md:col-span-3 text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg flex items-center gap-1">
+                  <CheckCircle className="w-3.5 h-3.5" /> Password changed successfully!
+                </p>
+              )}
+              <div className="md:col-span-3">
+                <button type="submit" disabled={changingPassword}
+                  className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors disabled:opacity-60">
+                  {changingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  {changingPassword ? 'Updating…' : 'Update password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       ) : (
         /* ── Orders Table ── */
         orders.length === 0 ? (
@@ -318,7 +536,11 @@ export default function FarmerDashboard() {
                 {orders.map(order => (
                   <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-4 py-3 font-medium text-gray-900">{order.listing?.title ?? order.listingId}</td>
-                    <td className="px-4 py-3 text-gray-600">{order.buyer?.name ?? order.buyerId}</td>
+                    <td className="px-4 py-3 text-gray-600">
+                      <Link href={`/buyers/${order.buyerId}`} className="hover:text-green-700 hover:underline transition-colors">
+                        {order.buyer?.name ?? order.buyerId}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3 text-gray-600">{order.quantity} {order.unit}</td>
                     <td className="px-4 py-3 font-semibold text-gray-800">{formatNaira(order.total)}</td>
                     <td className="px-4 py-3"><OrderStatusBadge status={order.status} /></td>

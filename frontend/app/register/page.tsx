@@ -31,26 +31,31 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center bg-gradient-to-br from-green-50 to-white px-4 py-16">
+    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center bg-gradient-to-br from-green-50 to-white dark:from-dark-bg dark:to-dark-surface px-4 py-16">
       <div className="w-full max-w-md">
+        {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-green-100 rounded-2xl mb-4">
-            <Sprout className="w-7 h-7 text-green-700" />
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-green-100 dark:bg-dark-muted rounded-2xl mb-4">
+            <Sprout className="w-7 h-7 text-green-700 dark:text-green-400" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
-          <p className="text-gray-500 mt-1 text-sm">Join FarmStand and start trading fresh produce</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-green-50">Create your account</h1>
+          <p className="text-gray-500 dark:text-green-400 mt-1 text-sm">Join FarmStand and start trading fresh produce</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 space-y-5">
+        {/* Form card */}
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white dark:bg-dark-surface rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-8 space-y-5"
+        >
           {error && (
-            <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg border border-red-100">
+            <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm px-4 py-3 rounded-lg border border-red-100 dark:border-red-800">
               {error}
             </div>
           )}
 
           {/* Role selector */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">I am a…</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-green-300 mb-2">I am a…</label>
             <div className="grid grid-cols-2 gap-3">
               {(['BUYER', 'FARMER'] as const).map((r) => (
                 <button
@@ -60,8 +65,8 @@ export default function RegisterPage() {
                   className={cn(
                     'flex flex-col items-center gap-2 py-4 px-3 rounded-xl border-2 transition-all text-sm font-medium',
                     role === r
-                      ? 'border-green-500 bg-green-50 text-green-700'
-                      : 'border-gray-200 text-gray-500 hover:border-green-200',
+                      ? 'border-green-500 bg-green-50 dark:bg-dark-muted text-green-700 dark:text-green-300'
+                      : 'border-gray-200 dark:border-dark-border text-gray-500 dark:text-green-500 hover:border-green-200 dark:hover:border-green-700',
                   )}
                 >
                   {r === 'FARMER' ? (
@@ -70,7 +75,7 @@ export default function RegisterPage() {
                     <ShoppingBasket className="w-6 h-6" />
                   )}
                   {r === 'FARMER' ? 'Farmer' : 'Buyer'}
-                  <span className="text-xs font-normal text-gray-400 leading-tight text-center">
+                  <span className="text-xs font-normal text-gray-400 dark:text-green-600 leading-tight text-center">
                     {r === 'FARMER' ? 'List & sell produce' : 'Browse & order produce'}
                   </span>
                 </button>
@@ -79,38 +84,38 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Full name</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-green-300 mb-1.5">Full name</label>
             <input
               type="text"
               required
               value={name}
               onChange={e => setName(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none transition"
+              className="w-full px-4 py-2.5 border border-gray-200 dark:border-dark-border rounded-lg text-sm bg-white dark:bg-dark-elevated text-gray-900 dark:text-green-100 placeholder-gray-400 dark:placeholder-green-700 focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none transition"
               placeholder="Adaeze Nwosu"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email address</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-green-300 mb-1.5">Email address</label>
             <input
               type="email"
               required
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none transition"
+              className="w-full px-4 py-2.5 border border-gray-200 dark:border-dark-border rounded-lg text-sm bg-white dark:bg-dark-elevated text-gray-900 dark:text-green-100 placeholder-gray-400 dark:placeholder-green-700 focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none transition"
               placeholder="you@example.com"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-green-300 mb-1.5">Password</label>
             <input
               type="password"
               required
               minLength={8}
               value={password}
               onChange={e => setPassword(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none transition"
+              className="w-full px-4 py-2.5 border border-gray-200 dark:border-dark-border rounded-lg text-sm bg-white dark:bg-dark-elevated text-gray-900 dark:text-green-100 placeholder-gray-400 dark:placeholder-green-700 focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none transition"
               placeholder="At least 8 characters"
             />
           </div>
@@ -124,9 +129,9 @@ export default function RegisterPage() {
             {loading ? 'Creating account…' : 'Create account'}
           </button>
 
-          <p className="text-center text-sm text-gray-500">
+          <p className="text-center text-sm text-gray-500 dark:text-green-500">
             Already have an account?{' '}
-            <Link href="/login" className="text-green-700 font-medium hover:underline">
+            <Link href="/login" className="text-green-700 dark:text-green-400 font-medium hover:underline">
               Sign in
             </Link>
           </p>

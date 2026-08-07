@@ -6,20 +6,22 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { ListingsModule } from './listings/listings.module';
 import { OrdersModule } from './orders/orders.module';
-import { EventsModule } from './events.module'; // <-- 1. Import EventsModule
+import { EventsModule } from './events.module';
+import { UsersModule } from './users/users.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
+    ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    MailModule,
     AuthModule,
     ListingsModule,
     OrdersModule,
-    EventsModule, // <-- 2. Add to imports
+    EventsModule,
+    UsersModule,
   ],
   controllers: [AppController],
-  providers: [AppService], // <-- 3. EventsGateway removed from here
+  providers: [AppService],
 })
 export class AppModule {}

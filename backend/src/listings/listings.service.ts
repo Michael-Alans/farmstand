@@ -2,7 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
-import { EventsGateway } from 'src/events.gateway';
+import { EventsGateway } from '../events.gateway';
 
 @Injectable()
 export class ListingsService {
@@ -49,6 +49,11 @@ export class ListingsService {
         orderBy,
         skip,
         take: pageSize,
+        include: {
+          farmer: {
+            select: { id: true, name: true, avatarUrl: true, isKycVerified: true },
+          },
+        },
       }),
       this.prisma.listing.count({ where }),
     ]);
@@ -62,7 +67,14 @@ export class ListingsService {
   }
 
   async findOne(id: string) {
-    const listing = await this.prisma.listing.findUnique({ where: { id } });
+    const listing = await this.prisma.listing.findUnique({
+      where: { id },
+      include: {
+        farmer: {
+          select: { id: true, name: true, avatarUrl: true, isKycVerified: true },
+        },
+      },
+    });
     if (!listing) throw new NotFoundException('Listing not found');
     return listing;
   }

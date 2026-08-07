@@ -34,8 +34,11 @@ export interface AuthUser {
   email: string;
   role: 'FARMER' | 'BUYER';
   accessToken: string;
+  bio?: string;
+  avatarUrl?: string;
+  isKycVerified?: boolean;
+  walletBalance?: number;
 }
-
 export interface RegisterPayload {
   name: string;
   email: string;
@@ -55,6 +58,25 @@ export const authApi = {
     request<AuthUser>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   logout: () =>
     request<void>('/auth/logout', { method: 'POST' }),
+  forgotPassword: (email: string) =>
+    request<{ message: string; resetToken?: string }>('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (token: string, newPassword: string) =>
+    request<{ message: string }>('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, newPassword }) }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ message: string }>('/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }),
+};
+
+export const usersApi = {
+  getFarmerProfile: (id: string) =>
+    request<Omit<Listing, 'id' | 'imageUrl' | 'price' | 'quantity' | 'status' | 'farmerId' | 'createdAt' | 'category' | 'description' | 'location' | 'unit'> & { bio?: string; avatarUrl?: string; isKycVerified: boolean; name: string; listings: Listing[] }>(`/users/farmer/${id}`),
+  getBuyerProfile: (id: string) =>
+    request<{ id: string; name: string; bio?: string; avatarUrl?: string; isKycVerified: boolean; createdAt: string; fulfilledOrderCount: number }>(`/users/buyer/${id}`),
+  updateProfile: (data: { bio?: string; avatarUrl?: string }) =>
+    request<AuthUser>('/users/me/profile', { method: 'PATCH', body: JSON.stringify(data) }),
+  simulateKyc: () =>
+    request<{ isKycVerified: boolean }>('/users/me/simulate-kyc', { method: 'POST' }),
+  getWalletBalance: () =>
+    request<{ walletBalance: number }>('/users/me/wallet'),
 };
 
 // ── Listings ──────────────────────────────────────────
@@ -75,6 +97,12 @@ export interface Listing {
   farmerId: string;
   farmerName?: string;
   createdAt: string;
+  farmer?: {
+    id: string;
+    name: string;
+    avatarUrl?: string | null;
+    isKycVerified: boolean;
+  };
 }
 
 export interface PaginatedListings {
@@ -136,6 +164,7 @@ export interface Order {
   unitPriceAtOrder: number;
   total: number;
   status: OrderStatus;
+  escrowStatus: 'HELD' | 'RELEASED' | 'REFUNDED';
   paymentReference?: string | null;
   buyerId: string;
   buyerName: string;
@@ -157,4 +186,6 @@ export const ordersApi = {
     request<Order[]>(`/orders/received${status ? `?status=${status}` : ''}`),
   updateStatus: (id: string, status: OrderStatus) =>
     request<Order>(`/orders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  releaseEscrow: (id: string) =>
+    request<Order>(`/orders/${id}/release-escrow`, { method: 'POST' }),
 };

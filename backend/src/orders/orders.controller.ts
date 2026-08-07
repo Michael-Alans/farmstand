@@ -40,4 +40,10 @@ export class OrdersController {
   ) {
     return this.ordersService.updateStatus(id, updateOrderStatusDto, user.id);
   }
+
+  @Roles('BUYER')
+  @Post(':id/release-escrow')
+  releaseEscrow(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.ordersService.releaseEscrow(id, user.id);
+  }
 }

@@ -8,6 +8,7 @@ interface AuthContextType {
   login: (data: LoginPayload) => Promise<void>;
   register: (data: RegisterPayload) => Promise<void>;
   logout: () => void;
+  updateUser: (patch: Partial<AuthUser>) => void;
   isLoading: boolean;
 }
 
@@ -19,7 +20,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Restore session from sessionStorage on mount
     const stored = sessionStorage.getItem('farmstand_token');
     const storedUser = sessionStorage.getItem('farmstand_user');
     if (stored && storedUser) {
@@ -54,8 +54,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }
 
+  function updateUser(patch: Partial<AuthUser>) {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      sessionStorage.setItem('farmstand_user', JSON.stringify(next));
+      return next;
+    });
+  }
+
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, updateUser, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

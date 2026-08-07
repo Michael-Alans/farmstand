@@ -3,3 +3,7 @@ node_modules/
 dist/
 .env
 .env.local
+
+# Windows reserved device name created by bad redirect
+nul
+backend/nul
